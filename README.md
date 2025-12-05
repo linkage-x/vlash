@@ -1,3 +1,8 @@
+In hirol lerobot container:
+```
+TOKENIZERS_PARALLELISM=false CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7   HF_HUB_OFFLINE=1 TRANSFORMERS_CACHE=/data/model HF_HUB_CACHE=/data/model   ACCELERATE_MIXED_PRECISION=bf16 PYTORCH_CUDA_AL
+LOC_CONF=expandable_segments:True   vlash train /vlash/examples/train/pi05/vlash_training_async_hirol_1212.yaml        --grad_accum_steps=2
+```
 <!-- markdownlint-disable MD001 MD041 -->
 
 <p align="center">

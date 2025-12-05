@@ -55,6 +55,52 @@ from vlash.layers.linear import QKVLinear, MergedColumnLinear
 from vlash.layers.rope import RotaryEmbedding
 
 
+def _load_paligemma_tokenizer(default_id: str = "google/paligemma-3b-pt-224") -> AutoTokenizer:
+    """Load Paligemma tokenizer, preferring a local path for offline setups."""
+
+    def _resolve_snapshot(path: str) -> str:
+        """If path is a HF cache repo root, return its first snapshot dir."""
+        snap_root = Path(path) / "snapshots"
+        if snap_root.is_dir():
+            snaps = sorted(p for p in snap_root.iterdir() if p.is_dir())
+            if snaps:
+                return str(snaps[0])
+        return path
+
+    def _load_from_path(path: str, local_only: bool) -> AutoTokenizer:
+        """Try fast tokenizer first, then slow as fallback."""
+        last_err = None
+        for use_fast in (True, False):
+            try:
+                return AutoTokenizer.from_pretrained(
+                    path, local_files_only=local_only, cache_dir=cache_dir, use_fast=use_fast
+                )
+            except Exception as exc:  # pragma: no cover - defensive path
+                last_err = exc
+        raise RuntimeError(f"Failed to load Paligemma tokenizer from {path}") from last_err
+
+    env_keys = ("PALIGEMMA_MODEL_PATH", "PALIGEMMA_TOKENIZER_PATH", "PALIGEMMA_LOCAL_PATH")
+    cache_dir = os.environ.get("HUGGINGFACE_HUB_CACHE") or os.environ.get("HF_HOME")
+    for key in env_keys:
+        override = os.environ.get(key)
+        if not override:
+            continue
+        resolved = _resolve_snapshot(os.path.expanduser(override))
+        try:
+            return _load_from_path(resolved, local_only=True)
+        except Exception as exc:  # pragma: no cover - defensive path
+            raise RuntimeError(f"Failed to load Paligemma tokenizer from {resolved} (set via {key}).") from exc
+
+    default_local_paths = ["/data/model/models--google--paligemma-3b-pt-224"]
+    for local_path in default_local_paths:
+        resolved = _resolve_snapshot(local_path)
+        if os.path.isdir(resolved):
+            return _load_from_path(resolved, local_only=True)
+
+    local_only = bool(os.environ.get("HF_HUB_OFFLINE"))
+    return _load_from_path(default_id, local_only=local_only)
+
+
 class PI05PrefixEmbedder(nn.Module):
     """Embed images and language tokens into prefix sequence.
     
@@ -904,7 +950,7 @@ class PI05Policy(PreTrainedPolicy):
         )
 
         # Initialize tokenizer and model
-        self.language_tokenizer = AutoTokenizer.from_pretrained("google/paligemma-3b-pt-224")
+        self.language_tokenizer = _load_paligemma_tokenizer()
         self.model = PI05Model(config)
 
         self.reset()
