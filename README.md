@@ -1,3 +1,5 @@
+HF_HUB_OFFLINE=1 TRANSFORMERS_CACHE=/data/model HF_HUB_CACHE=/data/model \
+    vlash train examples/train/pi05/vlash_training_async_hirol.yaml
 <!-- markdownlint-disable MD001 MD041 -->
 
 <p align="center">
